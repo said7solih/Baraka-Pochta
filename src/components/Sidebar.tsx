@@ -17,6 +17,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Аналитика', icon: '📊', roles: ['owner'] },
   { href: '/dashboard/expenses', label: 'Расходы', icon: '💸', roles: ['owner'] },
   { href: '/parcels', label: 'Накладные', icon: '📦', roles: ['owner', 'employee'] },
+  { href: '/warehouse', label: 'Склад', icon: '🏭', roles: ['owner', 'employee'] },
   { href: '/parcels/upload', label: 'Загрузить', icon: '⬆️', roles: ['owner', 'employee'] },
   { href: '/clients', label: 'Клиенты', icon: '👥', roles: ['owner', 'employee'] },
   { href: '/track', label: 'Мои посылки', icon: '🔍', roles: ['client'] },
