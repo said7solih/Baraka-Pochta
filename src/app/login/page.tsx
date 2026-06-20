@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type LoginMode = 'staff' | 'client'
-type StaffStep = 'phone' | 'otp'
 type ClientStep = 'code' | 'phone' | 'otp'
 
 export default function LoginPage() {
@@ -16,10 +15,9 @@ export default function LoginPage() {
 
   const [mode, setMode] = useState<LoginMode>('staff')
 
-  // Staff (owner/employee) state
-  const [staffPhone, setStaffPhone] = useState('')
-  const [staffOtp, setStaffOtp] = useState('')
-  const [staffStep, setStaffStep] = useState<StaffStep>('phone')
+  // Staff (owner/employee) state — email + password
+  const [staffEmail, setStaffEmail] = useState('')
+  const [staffPassword, setStaffPassword] = useState('')
 
   // Client state
   const [clientCode, setClientCode] = useState('')
@@ -36,26 +34,13 @@ export default function LoginPage() {
     return digits.startsWith('998') ? `+${digits}` : `+998${digits}`
   }
 
-  // --- STAFF FLOW ---
-  async function handleStaffSendOtp() {
+  // --- STAFF FLOW (email + password) ---
+  async function handleStaffLogin() {
     setError('')
     setLoading(true)
-    const phone = formatPhone(staffPhone)
-    const { error } = await supabase.auth.signInWithOtp({ phone })
-    setLoading(false)
-    if (error) { setError(error.message); return }
-    setMessage(`Код отправлен на ${phone}`)
-    setStaffStep('otp')
-  }
-
-  async function handleStaffVerifyOtp() {
-    setError('')
-    setLoading(true)
-    const phone = formatPhone(staffPhone)
-    const { data, error } = await supabase.auth.verifyOtp({
-      phone,
-      token: staffOtp,
-      type: 'sms',
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: staffEmail.trim(),
+      password: staffPassword,
     })
     setLoading(false)
     if (error) { setError(error.message); return }
@@ -198,65 +183,42 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* STAFF FORM */}
+        {/* STAFF FORM — email + password */}
         {mode === 'staff' && (
           <div className="space-y-4">
-            {staffStep === 'phone' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Номер телефона
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="+998 90 123 45 67"
-                    value={staffPhone}
-                    onChange={e => setStaffPhone(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleStaffSendOtp()}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-                <button
-                  onClick={handleStaffSendOtp}
-                  disabled={loading || !staffPhone}
-                  className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                >
-                  {loading ? 'Отправка...' : 'Отправить код'}
-                </button>
-              </>
-            )}
-
-            {staffStep === 'otp' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Код из SMS
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="123456"
-                    maxLength={6}
-                    value={staffOtp}
-                    onChange={e => setStaffOtp(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleStaffVerifyOtp()}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm tracking-widest text-center text-lg"
-                  />
-                </div>
-                <button
-                  onClick={handleStaffVerifyOtp}
-                  disabled={loading || staffOtp.length < 4}
-                  className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                >
-                  {loading ? 'Проверка...' : 'Войти'}
-                </button>
-                <button
-                  onClick={() => { setStaffStep('phone'); setStaffOtp(''); setMessage('') }}
-                  className="w-full py-2 text-sm text-gray-500 hover:text-gray-700"
-                >
-                  Изменить номер
-                </button>
-              </>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                placeholder="owner@baraka.uz"
+                value={staffEmail}
+                onChange={e => setStaffEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleStaffLogin()}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Пароль
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={staffPassword}
+                onChange={e => setStaffPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleStaffLogin()}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              />
+            </div>
+            <button
+              onClick={handleStaffLogin}
+              disabled={loading || !staffEmail || !staffPassword}
+              className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              {loading ? 'Вход...' : 'Войти'}
+            </button>
           </div>
         )}
 
