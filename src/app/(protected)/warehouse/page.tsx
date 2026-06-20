@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Parcel, ParcelStatus, CargoType, STATUS_LABELS } from '@/types'
+import { Parcel, ParcelStatus, CargoType, STATUS_LABELS, Client } from '@/types'
 import clsx from 'clsx'
 
 const STATUS_COLORS: Record<ParcelStatus, string> = {
@@ -46,6 +46,12 @@ export default function WarehousePage() {
   const [statusSaving, setStatusSaving] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
 
+  // Client autocomplete
+  const [clientSuggestions, setClientSuggestions] = useState<Client[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [clientFound, setClientFound] = useState<boolean | null>(null)
+  const codeRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => { load() }, [filter])
 
   async function load() {
@@ -69,7 +75,10 @@ export default function WarehousePage() {
     setForm({ ...EMPTY, date: new Date().toISOString().slice(0, 10) })
     setEditId(null)
     setFormError('')
+    setClientFound(null)
+    setShowSuggestions(false)
     setModal('add')
+    setTimeout(() => codeRef.current?.focus(), 100)
   }
 
   function openEdit(p: Parcel) {
@@ -77,6 +86,8 @@ export default function WarehousePage() {
     setForm(rest)
     setEditId(id)
     setFormError('')
+    setClientFound(true)
+    setShowSuggestions(false)
     setModal('edit')
   }
 
@@ -112,6 +123,42 @@ export default function WarehousePage() {
 
   function f(field: keyof Omit<Parcel, 'id'>, value: unknown) {
     setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  async function handleClientCodeChange(val: string) {
+    const code = val.toUpperCase()
+    f('client_code', code)
+    setClientFound(null)
+    if (code.length < 2) { setClientSuggestions([]); setShowSuggestions(false); return }
+
+    const { data } = await supabase
+      .from('clients')
+      .select('*')
+      .ilike('client_code', `${code}%`)
+      .limit(6)
+
+    setClientSuggestions(data ?? [])
+    setShowSuggestions((data ?? []).length > 0)
+  }
+
+  function applyClient(client: Client) {
+    setForm(prev => ({
+      ...prev,
+      client_code: client.client_code,
+      name: client.name ?? prev.name,
+      phone: client.phone ?? prev.phone,
+      address: client.address ?? prev.address,
+    }))
+    setClientFound(true)
+    setShowSuggestions(false)
+    setClientSuggestions([])
+  }
+
+  async function checkExactClient(code: string) {
+    if (!code) return
+    const { data } = await supabase.from('clients').select('*').eq('client_code', code).single()
+    if (data) { applyClient(data) }
+    else { setClientFound(false) }
   }
 
   const statuses: ParcelStatus[] = ['Omborda', 'Yetkazib berildi', 'Qaytib keldi', 'Olinmagan']
@@ -263,10 +310,40 @@ export default function WarehousePage() {
                 <label className="label">Дата прихода *</label>
                 <input type="date" value={form.date} onChange={e => f('date', e.target.value)} className="inp" />
               </div>
-              <div>
+              <div className="relative">
                 <label className="label">Код клиента *</label>
-                <input type="text" placeholder="BB01101" value={form.client_code}
-                  onChange={e => f('client_code', e.target.value.toUpperCase())} className="inp font-mono uppercase" />
+                <div className="relative">
+                  <input
+                    ref={codeRef}
+                    type="text"
+                    placeholder="BB01101"
+                    value={form.client_code}
+                    onChange={e => handleClientCodeChange(e.target.value)}
+                    onBlur={() => { setTimeout(() => setShowSuggestions(false), 150); checkExactClient(form.client_code) }}
+                    className={clsx('inp font-mono uppercase pr-8', clientFound === true && 'border-green-400', clientFound === false && 'border-red-400')}
+                  />
+                  {clientFound === true && <span className="absolute right-2 top-2 text-green-500">✓</span>}
+                  {clientFound === false && <span className="absolute right-2 top-2 text-red-400">?</span>}
+                </div>
+                {showSuggestions && (
+                  <div className="absolute z-10 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                    {clientSuggestions.map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onMouseDown={() => applyClient(c)}
+                        className="w-full px-3 py-2 text-left hover:bg-indigo-50 text-sm flex items-center justify-between"
+                      >
+                        <span className="font-mono font-semibold text-indigo-700">{c.client_code}</span>
+                        <span className="text-gray-600 truncate ml-2">{c.name}</span>
+                        <span className="text-gray-400 text-xs ml-2 shrink-0">{c.phone}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {clientFound === false && (
+                  <p className="text-xs text-orange-500 mt-1">Клиент не найден — данные нужно ввести вручную</p>
+                )}
               </div>
               <div>
                 <label className="label">Имя клиента</label>
